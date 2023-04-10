@@ -5,6 +5,8 @@ use std::ops::Mul;
 use num_bigint::{BigInt, Sign};
 use once_cell::sync::Lazy;
 
+use super::number_theory::{mod_inverse, modulo};
+
 // secp256k1 is y^2 = x^3 + 7
 
 /// the curve is mod P
@@ -30,13 +32,13 @@ pub static O: Lazy<BigInt> = Lazy::new(|| {
 /// the curve generator point
 pub static G: Lazy<Point> = Lazy::new(|| {
     Point::new(
-        BigInt::from_bytes_be(
+        &BigInt::from_bytes_be(
             Sign::Plus,
             hex::decode("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
                 .unwrap()
                 .as_slice(),
         ),
-        BigInt::from_bytes_be(
+        &BigInt::from_bytes_be(
             Sign::Plus,
             hex::decode("483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
                 .unwrap()
@@ -52,22 +54,22 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn new(x: BigInt, y: BigInt) -> Self {
+    pub fn new(x: &BigInt, y: &BigInt) -> Self {
         Self {
-            x: mod_p(x),
-            y: mod_p(y),
+            x: modulo(x, &P),
+            y: modulo(y, &P),
         }
     }
 
     pub fn from_hex(x: &str, y: &str) -> Self {
         Point::new(
-            BigInt::from_bytes_be(Sign::Plus, hex::decode(x).unwrap().as_slice()),
-            BigInt::from_bytes_be(Sign::Plus, hex::decode(y).unwrap().as_slice()),
+            &BigInt::from_bytes_be(Sign::Plus, hex::decode(x).unwrap().as_slice()),
+            &BigInt::from_bytes_be(Sign::Plus, hex::decode(y).unwrap().as_slice()),
         )
     }
 
     pub fn infinity() -> Self {
-        Point::new(BigInt::from(0), BigInt::from(0))
+        Point::new(&BigInt::default(), &BigInt::default())
     }
 
     pub fn is_on_curve(&self) -> bool {
@@ -75,7 +77,7 @@ impl Point {
     }
 
     pub fn inverse(&self) -> Point {
-        Point::new(self.x.clone(), self.y.clone().mul(-1))
+        Point::new(&self.x, &self.y.clone().mul(-1))
     }
 
     pub fn add(&self, q: &Point) -> Point {
@@ -95,20 +97,20 @@ impl Point {
 
         if *self == *q {
             // to avoid division by zero we have a special case for point doubling
-            let numerator = mod_p(3 * self.x.pow(2));
-            let denominator = mod_p(2 * self.y.clone());
-            lambda = mod_p(numerator * mod_inverse(&denominator, &P));
+            let numerator = modulo(&(3 * self.x.pow(2)), &P);
+            let denominator = modulo(&(2 * self.y.clone()), &P);
+            lambda = modulo(&(numerator * mod_inverse(&denominator, &P)), &P);
         } else {
             // lambda = mpdmod_p() * mod_inverse(&(), &P);
-            let numerator = mod_p(q.clone().y - self.clone().y);
-            let denominator = mod_p(q.clone().x - self.clone().x);
-            lambda = mod_p(numerator * mod_inverse(&denominator, &P));
+            let numerator = modulo(&(q.clone().y - self.clone().y), &P);
+            let denominator = modulo(&(q.clone().x - self.clone().x), &P);
+            lambda = modulo(&(numerator * mod_inverse(&denominator, &P)), &P);
         }
 
         let xr = lambda.clone().pow(2) - q.clone().x - self.clone().x;
         let yr = lambda * (self.clone().x - xr.clone()) - self.clone().y;
 
-        Point::new(xr, yr)
+        Point::new(&xr, &yr)
     }
 
     pub fn mul(&self, a: &BigInt) -> Point {
@@ -136,43 +138,11 @@ impl PartialEq for Point {
 
 impl Eq for Point {}
 
-/// calculate a value mod p
-fn mod_p(val: BigInt) -> BigInt {
-    let mut result = val % P.clone();
-
-    while result.lt(&BigInt::from(0)) {
-        result += P.clone();
-    }
-
-    result
-}
-
-fn mod_inverse(n: &BigInt, p: &BigInt) -> BigInt {
-    if p == &BigInt::from(1) {
-        return BigInt::from(1);
-    }
-
-    let (mut a, mut m, mut x, mut inv) = (n.clone(), p.clone(), BigInt::from(0), BigInt::from(1));
-
-    while a > BigInt::from(1) {
-        let div = a.clone() / m.clone();
-        let rem = a.clone() % m.clone();
-        inv -= div * &x;
-        a = rem;
-        std::mem::swap(&mut a, &mut m);
-        std::mem::swap(&mut x, &mut inv);
-    }
-
-    if inv < BigInt::from(0) {
-        inv += p
-    }
-
-    inv
-}
-
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
+
+    use crate::ecdsa::number_theory::mod_inverse;
 
     use super::*;
 
