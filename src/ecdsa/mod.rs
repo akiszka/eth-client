@@ -1,8 +1,5 @@
-use std::ops::Shl;
-
-use num_bigint::{BigInt, RandBigInt, RandomBits};
-
-use crate::keccak::keccak256;
+use num_bigint::{BigInt, BigUint, RandBigInt};
+use crate::{address::Address, keccak::keccak256};
 
 use self::curve::G;
 
@@ -48,7 +45,7 @@ pub fn encode_public_key_compressed(public_key: &curve::Point) -> Vec<u8> {
     result
 }
 
-pub fn get_address(public_key: &curve::Point) -> String {
+pub fn get_address(public_key: &curve::Point) -> Address {
     let public_key: Vec<u8> = encode_public_key_uncompressed(public_key)
         .into_iter()
         .skip(1)
@@ -56,7 +53,7 @@ pub fn get_address(public_key: &curve::Point) -> String {
     // let public_key = hex::encode(public_key);
     println!("usable pk: {:?}", hex::encode(public_key.clone()));
     let hash: Vec<u8> = keccak256(&public_key).into_iter().skip(12).collect();
-    hex::encode(hash)
+    Address::from(BigUint::from_bytes_be(&hash))
 }
 
 pub fn sign(private_key: &BigInt, message: &[u8]) -> (BigInt, BigInt) {
