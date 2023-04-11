@@ -1,10 +1,10 @@
 Implement:
 
-- [ ] ecdsa
+- [x] ecdsa
+- [x] rlp
 - [ ] merkle trees
-- [ ] rlp
 
 Use:
 
 - [ ] serde (for json)
-- [ ] tokioz
+- [ ] tokio
