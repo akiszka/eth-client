@@ -58,8 +58,6 @@ pub fn get_address(public_key: &curve::Point) -> Address {
         .into_iter()
         .skip(1)
         .collect();
-    // let public_key = hex::encode(public_key);
-    println!("usable pk: {:?}", hex::encode(public_key.clone()));
     let hash: Vec<u8> = keccak256(&public_key).into_iter().skip(12).collect();
     Address::from(BigUint::from_bytes_be(&hash))
 }
@@ -77,28 +75,28 @@ impl Signature {
         let mut rand = rand::thread_rng();
 
         let mut k = BigInt::default();
-        let mut R = Point::infinity();
+        let mut r_point = Point::infinity();
 
-        while R.x == BigInt::default() {
+        while r_point.x == BigInt::default() {
             k = rand.gen_bigint_range(&BigInt::from(0), &curve::O);
-            R = G.mul(&k);
+            r_point = G.mul(&k);
         }
 
-        let r = modulo(&R.x, &O);
+        let r = modulo(&r_point.x, &O);
 
         let hash = BigInt::from_bytes_be(num_bigint::Sign::Plus, &hash);
 
         let s = (hash + private_key * r.clone()) * mod_inverse(&k, &O);
         let s = modulo(&s, &O);
 
-        let recovery_id = if R.y % 2 == BigInt::from(0) {
-            if R.x < O.clone() {
+        let recovery_id = if r_point.y % 2 == BigInt::from(0) {
+            if r_point.x < O.clone() {
                 0
             } else {
                 2
             }
         } else {
-            if R.x < O.clone() {
+            if r_point.x < O.clone() {
                 1
             } else {
                 3
@@ -163,7 +161,7 @@ impl Signature {
         let recovery_id = self.v - 27;
 
         let mut x = self.r.clone();
-        let mut y = BigInt::default();
+        let y;
 
         let is_even = recovery_id % 2 == 0;
         let is_over_o = recovery_id > 1;
