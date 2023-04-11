@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod address;
 mod ecdsa;
 mod keccak;
